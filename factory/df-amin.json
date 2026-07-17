@@ -1,0 +1,15 @@
+{
+	"name": "df-amin",
+	"properties": {
+		"trustModeClaimForMi": {
+			"value": "Disabled",
+			"editable": true
+		}
+	},
+	"location": "westeurope",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "7688bf3f-77c7-4877-8091-17c42ebf6781",
+		"tenantId": "a2e466aa-4f86-4545-b5b8-97da7c8febf3"
+	}
+}
