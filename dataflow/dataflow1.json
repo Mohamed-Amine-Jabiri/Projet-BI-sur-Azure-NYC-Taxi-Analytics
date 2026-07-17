@@ -15,10 +15,16 @@
 			"sinks": [],
 			"transformations": [
 				{
-					"name": "derivedColumn1"
+					"name": "GestionValeursNulles"
 				},
 				{
-					"name": "filter1"
+					"name": "Suppressiondesdonneesincoherentes"
+				},
+				{
+					"name": "Creationdescolonnescalculees"
+				},
+				{
+					"name": "aggregate1"
 				}
 			],
 			"scriptLines": [
@@ -58,11 +64,37 @@
 				"          improvement_surcharge = coalesce(improvement_surcharge, 0.0),",
 				"          congestion_surcharge = coalesce(congestion_surcharge, 0.0),",
 				"          cbd_congestion_fee = coalesce(cbd_congestion_fee, 0.0),",
-				"          store_and_fwd_flag = coalesce(store_and_fwd_flag, 'N')) ~> derivedColumn1",
-				"derivedColumn1 filter(trip_distance > 0 &&",
+				"          store_and_fwd_flag = coalesce(store_and_fwd_flag, 'N')) ~> GestionValeursNulles",
+				"GestionValeursNulles filter(trip_distance > 0 &&",
 				"fare_amount >= 0 &&",
 				"total_amount >= 0 &&",
-				"passenger_count > 0) ~> filter1"
+				"passenger_count > 0) ~> Suppressiondesdonneesincoherentes",
+				"aggregate1 derive(revenue = fare_amount + tip_amount,",
+				"          tip_percentage = iif(fare_amount == 0.0, toDouble(0), toDouble(tip_amount / fare_amount) * 100),",
+				"          total_fees = extra + mta_tax + tolls_amount + improvement_surcharge + congestion_surcharge + Airport_fee + cbd_congestion_fee,",
+				"          trip_type = iif(trip_distance < 5,'Short Trip','Long Trip'),",
+				"          colonne3 = ERROR_FUNCTION(''),",
+				"          colonne2 = ERROR_FUNCTION('')) ~> Creationdescolonnescalculees",
+				"Suppressiondesdonneesincoherentes aggregate(groupBy(VendorID,",
+				"          tpep_pickup_datetime,",
+				"          tpep_dropoff_datetime,",
+				"          PULocationID,",
+				"          DOLocationID,",
+				"          trip_distance,",
+				"          fare_amount,",
+				"          total_amount,",
+				"          payment_type),",
+				"     passenger_count = first(passenger_count),",
+				"          RatecodeID = first(RatecodeID),",
+				"          store_and_fwd_flag = first(store_and_fwd_flag),",
+				"          extra = first(extra),",
+				"          mta_tax = first(mta_tax),",
+				"          tip_amount = first(tip_amount),",
+				"          tolls_amount = first(tolls_amount),",
+				"          improvement_surcharge = first(improvement_surcharge),",
+				"          congestion_surcharge =  first(congestion_surcharge),",
+				"          Airport_fee = first(Airport_fee),",
+				"          cbd_congestion_fee = first(cbd_congestion_fee)) ~> aggregate1"
 			]
 		}
 	}
