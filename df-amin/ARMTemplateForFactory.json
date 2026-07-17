@@ -86,6 +86,43 @@
 								"parameters": {}
 							}
 						]
+					},
+					{
+						"name": "Data flow1",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "Copy data1",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "DF_Clean_Trips",
+								"type": "DataFlowReference",
+								"parameters": {},
+								"datasetParameters": {
+									"source1": {},
+									"sink1": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
 					}
 				],
 				"policy": {
@@ -96,7 +133,34 @@
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/datasets/DS_HTTP_Parquet')]",
-				"[concat(variables('factoryId'), '/datasets/DS_RAW')]"
+				"[concat(variables('factoryId'), '/datasets/DS_RAW')]",
+				"[concat(variables('factoryId'), '/dataflows/DF_Clean_Trips')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/DS_CURATED')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "LS_ADLS",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "yellow_tripdata_2026_02_clean.parquet",
+						"folderPath": "trip-data",
+						"fileSystem": "curated"
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/LS_ADLS')]"
 			]
 		},
 		{
@@ -137,6 +201,8 @@
 				"typeProperties": {
 					"location": {
 						"type": "AzureBlobFSLocation",
+						"fileName": "yellow_tripdata_2026-02_snappy.parquet",
+						"folderPath": "trip-data",
 						"fileSystem": "raw"
 					},
 					"compressionCodec": "snappy"
@@ -180,7 +246,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('factoryName'), '/dataflow1')]",
+			"name": "[concat(parameters('factoryName'), '/DF_Clean_Trips')]",
 			"type": "Microsoft.DataFactory/factories/dataflows",
 			"apiVersion": "2018-06-01",
 			"properties": {
@@ -188,18 +254,117 @@
 				"typeProperties": {
 					"sources": [
 						{
+							"dataset": {
+								"referenceName": "DS_RAW",
+								"type": "DatasetReference"
+							},
 							"name": "source1"
 						}
 					],
-					"sinks": [],
-					"transformations": [],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "DS_CURATED",
+								"type": "DatasetReference"
+							},
+							"name": "sink1"
+						}
+					],
+					"transformations": [
+						{
+							"name": "GestionValeursNulles"
+						},
+						{
+							"name": "Suppressiondesdonneesincoherentes"
+						},
+						{
+							"name": "Creationdescolonnescalculees"
+						},
+						{
+							"name": "aggregate1"
+						}
+					],
 					"scriptLines": [
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false) ~> source1"
+						"source(output(",
+						"          VendorID as integer,",
+						"          tpep_pickup_datetime as timestamp,",
+						"          tpep_dropoff_datetime as timestamp,",
+						"          passenger_count as long,",
+						"          trip_distance as double,",
+						"          RatecodeID as long,",
+						"          store_and_fwd_flag as string,",
+						"          PULocationID as integer,",
+						"          DOLocationID as integer,",
+						"          payment_type as long,",
+						"          fare_amount as double,",
+						"          extra as double,",
+						"          mta_tax as double,",
+						"          tip_amount as double,",
+						"          tolls_amount as double,",
+						"          improvement_surcharge as double,",
+						"          total_amount as double,",
+						"          congestion_surcharge as double,",
+						"          Airport_fee as double,",
+						"          cbd_congestion_fee as double",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     format: 'parquet') ~> source1",
+						"source1 derive(passenger_count = coalesce(passenger_count, 1),",
+						"          fare_amount = coalesce(fare_amount, 0.0),",
+						"          tip_amount = coalesce(tip_amount, 0.0),",
+						"          total_amount = coalesce(total_amount, 0.0),",
+						"          extra = coalesce(extra, 0.0),",
+						"          mta_tax = coalesce(mta_tax, 0.0),",
+						"          tolls_amount = coalesce(tolls_amount, 0.0),",
+						"          improvement_surcharge = coalesce(improvement_surcharge, 0.0),",
+						"          congestion_surcharge = coalesce(congestion_surcharge, 0.0),",
+						"          cbd_congestion_fee = coalesce(cbd_congestion_fee, 0.0),",
+						"          store_and_fwd_flag = coalesce(store_and_fwd_flag, 'N')) ~> GestionValeursNulles",
+						"GestionValeursNulles filter(trip_distance > 0 &&",
+						"fare_amount >= 0 &&",
+						"total_amount >= 0 &&",
+						"passenger_count > 0) ~> Suppressiondesdonneesincoherentes",
+						"aggregate1 derive(revenue = fare_amount + tip_amount,",
+						"          tip_percentage = iif(fare_amount == 0.0, toDouble(0), toDouble(tip_amount / fare_amount) * 100),",
+						"          total_fees = extra + mta_tax + tolls_amount + improvement_surcharge + congestion_surcharge + Airport_fee + cbd_congestion_fee,",
+						"          trip_type = iif(trip_distance < 5,'Short Trip','Long Trip')) ~> Creationdescolonnescalculees",
+						"Suppressiondesdonneesincoherentes aggregate(groupBy(VendorID,",
+						"          tpep_pickup_datetime,",
+						"          tpep_dropoff_datetime,",
+						"          PULocationID,",
+						"          DOLocationID,",
+						"          trip_distance,",
+						"          fare_amount,",
+						"          total_amount,",
+						"          payment_type),",
+						"     passenger_count = first(passenger_count),",
+						"          RatecodeID = first(RatecodeID),",
+						"          store_and_fwd_flag = first(store_and_fwd_flag),",
+						"          extra = first(extra),",
+						"          mta_tax = first(mta_tax),",
+						"          tip_amount = first(tip_amount),",
+						"          tolls_amount = first(tolls_amount),",
+						"          improvement_surcharge = first(improvement_surcharge),",
+						"          congestion_surcharge = first(congestion_surcharge),",
+						"          Airport_fee = first(Airport_fee),",
+						"          cbd_congestion_fee = first(cbd_congestion_fee)) ~> aggregate1",
+						"Creationdescolonnescalculees sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'parquet',",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sink1"
 					]
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/DS_RAW')]",
+				"[concat(variables('factoryId'), '/datasets/DS_CURATED')]"
+			]
 		}
 	]
 }
