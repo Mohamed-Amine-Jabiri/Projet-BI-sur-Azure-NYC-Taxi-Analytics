@@ -10,6 +10,8 @@
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
+				"fileName": "yellow_tripdata_2026-02_snappy.parquet",
+				"folderPath": "trip-data",
 				"fileSystem": "raw"
 			},
 			"compressionCodec": "snappy"
