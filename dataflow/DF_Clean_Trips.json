@@ -1,5 +1,5 @@
 {
-	"name": "dataflow1",
+	"name": "DF_Clean_Trips",
 	"properties": {
 		"type": "MappingDataFlow",
 		"typeProperties": {
@@ -12,7 +12,15 @@
 					"name": "source1"
 				}
 			],
-			"sinks": [],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "DS_CURATED",
+						"type": "DatasetReference"
+					},
+					"name": "sink1"
+				}
+			],
 			"transformations": [
 				{
 					"name": "GestionValeursNulles"
@@ -72,9 +80,7 @@
 				"aggregate1 derive(revenue = fare_amount + tip_amount,",
 				"          tip_percentage = iif(fare_amount == 0.0, toDouble(0), toDouble(tip_amount / fare_amount) * 100),",
 				"          total_fees = extra + mta_tax + tolls_amount + improvement_surcharge + congestion_surcharge + Airport_fee + cbd_congestion_fee,",
-				"          trip_type = iif(trip_distance < 5,'Short Trip','Long Trip'),",
-				"          colonne3 = ERROR_FUNCTION(''),",
-				"          colonne2 = ERROR_FUNCTION('')) ~> Creationdescolonnescalculees",
+				"          trip_type = iif(trip_distance < 5,'Short Trip','Long Trip')) ~> Creationdescolonnescalculees",
 				"Suppressiondesdonneesincoherentes aggregate(groupBy(VendorID,",
 				"          tpep_pickup_datetime,",
 				"          tpep_dropoff_datetime,",
@@ -94,7 +100,15 @@
 				"          improvement_surcharge = first(improvement_surcharge),",
 				"          congestion_surcharge =  first(congestion_surcharge),",
 				"          Airport_fee = first(Airport_fee),",
-				"          cbd_congestion_fee = first(cbd_congestion_fee)) ~> aggregate1"
+				"          cbd_congestion_fee = first(cbd_congestion_fee)) ~> aggregate1",
+				"Creationdescolonnescalculees sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'parquet',",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> sink1"
 			]
 		}
 	}
