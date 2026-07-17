@@ -16,6 +16,9 @@
 			"transformations": [
 				{
 					"name": "derivedColumn1"
+				},
+				{
+					"name": "filter1"
 				}
 			],
 			"scriptLines": [
@@ -45,7 +48,21 @@
 				"     validateSchema: false,",
 				"     ignoreNoFilesFound: false,",
 				"     format: 'parquet') ~> source1",
-				"source1 derive() ~> derivedColumn1"
+				"source1 derive(passenger_count = coalesce(passenger_count, 1),",
+				"          fare_amount = coalesce(fare_amount, 0.0),",
+				"          tip_amount =  coalesce(tip_amount, 0.0),",
+				"          total_amount = coalesce(total_amount, 0.0),",
+				"          extra = coalesce(extra, 0.0),",
+				"          mta_tax = coalesce(mta_tax, 0.0),",
+				"          tolls_amount = coalesce(tolls_amount, 0.0),",
+				"          improvement_surcharge = coalesce(improvement_surcharge, 0.0),",
+				"          congestion_surcharge = coalesce(congestion_surcharge, 0.0),",
+				"          cbd_congestion_fee = coalesce(cbd_congestion_fee, 0.0),",
+				"          store_and_fwd_flag = coalesce(store_and_fwd_flag, 'N')) ~> derivedColumn1",
+				"derivedColumn1 filter(trip_distance > 0 &&",
+				"fare_amount >= 0 &&",
+				"total_amount >= 0 &&",
+				"passenger_count > 0) ~> filter1"
 			]
 		}
 	}
